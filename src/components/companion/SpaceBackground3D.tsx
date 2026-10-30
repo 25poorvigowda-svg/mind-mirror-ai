@@ -2,6 +2,11 @@ import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+function pseudoRandom(i: number) {
+  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 /**
  * 3D Starfield & Floating Celestial Dust Particles
  * Gently reacts to mouse cursor movement across the entire website.
@@ -19,11 +24,11 @@ function CosmicParticles() {
     const colorC = new THREE.Color('#2dd4bf'); // teal
 
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 16;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 12;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 10 - 2;
+      pos[i * 3] = (pseudoRandom(i * 3) - 0.5) * 16;
+      pos[i * 3 + 1] = (pseudoRandom(i * 3 + 1) - 0.5) * 12;
+      pos[i * 3 + 2] = (pseudoRandom(i * 3 + 2) - 0.5) * 10 - 2;
 
-      const pick = Math.random();
+      const pick = pseudoRandom(i + 500);
       const c = pick < 0.4 ? colorA : pick < 0.7 ? colorB : colorC;
       col[i * 3] = c.r;
       col[i * 3 + 1] = c.g;
@@ -87,7 +92,7 @@ function CosmicParticles() {
 
 export const SpaceBackground3D: React.FC = () => {
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-85">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-75 dark:opacity-85 light:opacity-25 transition-opacity duration-300">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 60 }}
         gl={{ antialias: true, alpha: true }}

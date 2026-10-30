@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DailyCheckIn, ActionTask, ExperimentDay, UserSettings, UserProfile } from './types';
+import type {
+  DailyCheckIn,
+  ActionTask,
+  ExperimentDay,
+  UserSettings,
+  UserProfile,
+  AppTheme,
+  AppLanguage,
+} from './types';
 import {
   db,
   getSettings,
+  updateSettings,
   initExperimentDays,
   seedRealisticDemoData,
   getUserProfile,
@@ -21,6 +30,7 @@ import { ExperimentView } from './views/ExperimentView';
 import { ProfileView } from './views/ProfileView';
 import { LoginView } from './views/LoginView';
 import { SettingsView } from './views/SettingsView';
+import { StudioView } from './views/StudioView';
 import confetti from 'canvas-confetti';
 
 export function App() {
@@ -30,13 +40,36 @@ export function App() {
   const [experimentDays, setExperimentDays] = useState<ExperimentDay[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
+  const [theme, setTheme] = useState<AppTheme>(() => {
+    const saved = localStorage.getItem('mm_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
   const [isLoading, setIsLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((current) => (current === msg ? null : current));
+    }, 4500);
+  };
+
+  // Sync theme with HTML root class
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
+    localStorage.setItem('mm_theme', theme);
+  }, [theme]);
 
   // Load all data from IndexedDB
   const reloadData = useCallback(async () => {
     try {
       const loadedSettings = await getSettings();
       setSettings(loadedSettings);
+      if (loadedSettings.theme && (loadedSettings.theme === 'light' || loadedSettings.theme === 'dark')) {
+        setTheme(loadedSettings.theme);
+      }
 
       const loadedProfile = await getUserProfile();
       setUserProfile(loadedProfile);
@@ -60,6 +93,23 @@ export function App() {
     reloadData();
   }, [reloadData]);
 
+  const handleToggleTheme = () => {
+    const nextTheme: AppTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    updateSettings({ theme: nextTheme });
+  };
+
+  const handleSelectLanguage = (newLang: AppLanguage) => {
+    setSettings((prev) => ({ ...prev, language: newLang }));
+    updateSettings({ language: newLang });
+    const langNames = {
+      'en-US': 'English',
+      'hi-IN': 'हिन्दी (Hindi)',
+      'kn-IN': 'ಕನ್ನಡ (Kannada)',
+    };
+    showToast(`Switched companion language to ${langNames[newLang]}`);
+  };
+
   // Check if user has already checked in today
   const todayStr = new Date().toISOString().split('T')[0];
   const todayCheckIn = checkIns.find((c) => c.date === todayStr);
@@ -73,7 +123,7 @@ export function App() {
       spread: 70,
       colors: ['#06b6d4', '#14b8a6', '#8b5cf6'],
     });
-    alert('14 Days of realistic student data loaded successfully! You can now explore all correlations, Pluto 3D voice interactions, and insight charts.');
+    showToast('14 Days of realistic student data loaded successfully! You can explore all correlations, Pluto 3D, and insights.');
   };
 
   const handleAddTaskFromCompanion = async (title: string) => {
@@ -87,7 +137,7 @@ export function App() {
     };
     await db.actionTasks.add(newTask);
     await reloadData();
-    alert(`Added micro-action to your Action Planner: "${title}"`);
+    showToast(`Added micro-action to your Action Planner: "${title}"`);
   };
 
   const handleLogout = () => {
@@ -110,7 +160,7 @@ export function App() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#070b14] text-slate-100 selection:bg-cyan-500 selection:text-slate-950 overflow-x-hidden">
+    <div className="relative min-h-screen flex flex-col bg-[#070b14] dark:bg-[#070b14] light:bg-[#f8fafc] text-slate-100 dark:text-slate-100 light:text-slate-800 selection:bg-cyan-500 selection:text-slate-950 overflow-x-hidden transition-colors duration-200">
       {/* Interactive 3D Cosmic Celestial Background Canvas */}
       <SpaceBackground3D />
 
@@ -123,6 +173,10 @@ export function App() {
         }}
         hasCheckedInToday={!!todayCheckIn}
         userProfile={userProfile}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        currentLanguage={settings.language || 'en-US'}
+        onSelectLanguage={handleSelectLanguage}
       />
 
       {/* Main Multi-Page Container */}
@@ -161,7 +215,12 @@ export function App() {
             settings={settings}
             userProfile={userProfile}
             onAddTaskToPlanner={handleAddTaskFromCompanion}
+            onSelectLanguage={handleSelectLanguage}
           />
+        )}
+
+        {activeTab === 'studio' && (
+          <StudioView onNotify={showToast} />
         )}
 
         {activeTab === 'checkin' && (
@@ -195,9 +254,27 @@ export function App() {
             settings={settings}
             onSettingsChanged={reloadData}
             onSeedDemoData={handleSeedDemoData}
+            onThemeChanged={(newTheme) => setTheme(newTheme)}
           />
         )}
       </main>
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <aside
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900/95 dark:bg-slate-900/95 light:bg-white/95 border border-cyan-500/40 text-cyan-200 dark:text-cyan-200 light:text-cyan-900 px-4 py-3 rounded-2xl shadow-xl shadow-cyan-950/50 backdrop-blur-md flex items-center justify-between gap-3 text-xs animate-fadeIn"
+        >
+          <span>{toastMessage}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white dark:hover:text-white light:hover:text-black font-bold px-1.5 py-0.5 rounded cursor-pointer"
+            aria-label="Close notification"
+          >
+            ×
+          </button>
+        </aside>
+      )}
 
       {/* Footer with Ethical Disclaimers */}
       <Footer />

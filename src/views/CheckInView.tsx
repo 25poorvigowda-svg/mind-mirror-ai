@@ -84,11 +84,9 @@ export const CheckInView: React.FC<CheckInViewProps> = ({
 
   const handleDeleteEntry = async (id?: number) => {
     if (!id) return;
-    if (window.confirm('Are you sure you want to delete this check-in entry?')) {
-      await db.checkIns.delete(id);
-      onCheckInSaved();
-      if (editingId === id) resetForm();
-    }
+    await db.checkIns.delete(id);
+    onCheckInSaved();
+    if (editingId === id) resetForm();
   };
 
   const handleAddTask = () => {

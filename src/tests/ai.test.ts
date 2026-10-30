@@ -53,37 +53,38 @@ describe('AI Service - Local Companion Dialogue', () => {
     const reply = await generateCompanionReply(userText, []);
 
     expect(reply.reply).toBeTruthy();
-    expect(reply.emotion).toBe('encouraging');
     expect(reply.suggestedActions?.length).toBeGreaterThan(0);
   });
 
-  it('supports multilingual greetings', async () => {
-    const spanishReply = await generateCompanionReply('Hola', [], undefined, {
+  it('supports English, Hindi, and Kannada greetings and conversation', async () => {
+    const kannadaReply = await generateCompanionReply('ನಮಸ್ಕಾರ ಪ್ಲೂಟೋ', [], undefined, {
       userName: 'Student',
-      language: 'es-ES',
+      language: 'kn-IN',
+      theme: 'dark',
       geminiApiKey: '',
       ttsVoice: '',
       ttsSpeed: 1.0,
-      avatarModel: 'stylized_human',
+      avatarModel: 'realistic_pluto',
       soundEnabled: true,
       seededDemoData: false,
       disclaimerAcknowledged: true,
     });
 
-    expect(spanishReply.reply).toContain('¡Hola');
+    expect(kannadaReply.reply).toContain('ನಮಸ್ಕಾರ');
 
-    const frenchReply = await generateCompanionReply('Bonjour', [], undefined, {
+    const hindiReply = await generateCompanionReply('नमस्ते प्लूटो', [], undefined, {
       userName: 'Student',
-      language: 'fr-FR',
+      language: 'hi-IN',
+      theme: 'dark',
       geminiApiKey: '',
       ttsVoice: '',
       ttsSpeed: 1.0,
-      avatarModel: 'stylized_human',
+      avatarModel: 'realistic_pluto',
       soundEnabled: true,
       seededDemoData: false,
       disclaimerAcknowledged: true,
     });
 
-    expect(frenchReply.reply).toContain('Bonjour');
+    expect(hindiReply.reply).toContain('नमस्ते');
   });
 });

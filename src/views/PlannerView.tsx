@@ -36,6 +36,7 @@ export const PlannerView: React.FC<PlannerViewProps> = ({ tasks, onTasksChanged 
 
   // Filter state
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [timerBanner, setTimerBanner] = useState<string | null>(null);
 
   // Pomodoro countdown effect
   useEffect(() => {
@@ -50,11 +51,11 @@ export const PlannerView: React.FC<PlannerViewProps> = ({ tasks, onTasksChanged 
       if (timerMode === 'focus') {
         setSessionsCompleted((s) => s + 1);
         confetti({ particleCount: 40, spread: 50 });
-        alert('Pomodoro Focus Sprint Complete! Take a well-deserved 5-minute break.');
+        setTimerBanner('🎉 Focus sprint complete! Take a relaxing 5-minute breather.');
         setTimerMode('shortBreak');
         setTimeLeft(5 * 60);
       } else {
-        alert('Break finished! Ready for your next focus session?');
+        setTimerBanner('✨ Break finished! Ready for your next deep focus sprint?');
         setTimerMode('focus');
         setTimeLeft(25 * 60);
       }
@@ -214,6 +215,19 @@ export const PlannerView: React.FC<PlannerViewProps> = ({ tasks, onTasksChanged 
               <RotateCcw className="w-4 h-4" />
             </button>
           </div>
+
+          {timerBanner && (
+            <div className="mt-3 text-xs font-medium text-teal-300 bg-teal-950/60 border border-teal-500/30 px-3 py-1.5 rounded-xl text-center flex items-center justify-between gap-2">
+              <span>{timerBanner}</span>
+              <button
+                onClick={() => setTimerBanner(null)}
+                className="text-slate-400 hover:text-white"
+                aria-label="Dismiss banner"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

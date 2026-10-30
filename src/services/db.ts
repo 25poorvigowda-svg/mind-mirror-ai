@@ -132,10 +132,11 @@ export async function updateUserProfile(partial: Partial<UserProfile>): Promise<
 export const DEFAULT_SETTINGS: UserSettings = {
   userName: 'Student Explorer',
   language: 'en-US',
+  theme: 'dark',
   geminiApiKey: '',
   ttsVoice: '',
   ttsSpeed: 1.0,
-  avatarModel: 'stylized_human',
+  avatarModel: 'realistic_pluto',
   soundEnabled: true,
   seededDemoData: false,
   disclaimerAcknowledged: true,

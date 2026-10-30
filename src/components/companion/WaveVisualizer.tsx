@@ -1,16 +1,21 @@
 import React from 'react';
 
 interface WaveVisualizerProps {
-  isActive: boolean;
+  isActive?: boolean;
+  isSpeaking?: boolean;
+  amplitude?: number;
   color?: 'cyan' | 'violet' | 'teal';
   bars?: number;
 }
 
 export const WaveVisualizer: React.FC<WaveVisualizerProps> = ({
   isActive,
+  isSpeaking,
+  amplitude = 0.5,
   color = 'cyan',
   bars = 9,
 }) => {
+  const active = isActive ?? isSpeaking ?? false;
   const barClass =
     color === 'violet'
       ? 'bg-violet-400 shadow-violet-500/50'
@@ -21,9 +26,10 @@ export const WaveVisualizer: React.FC<WaveVisualizerProps> = ({
   return (
     <div className="flex items-center justify-center gap-1.5 h-8 px-3">
       {Array.from({ length: bars }).map((_, i) => {
-        const heightStyle = isActive
+        const heightStyle = active
           ? {
               animation: `pulseBar 0.8s ease-in-out infinite ${(i * 0.12) % 0.6}s`,
+              transform: `scaleY(${0.6 + amplitude * 0.8})`,
             }
           : { height: '4px' };
 

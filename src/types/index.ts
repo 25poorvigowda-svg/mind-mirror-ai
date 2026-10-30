@@ -68,14 +68,55 @@ export interface ExperimentDay {
   userNotes?: string;
 }
 
+export type EmotionType =
+  | 'calm'
+  | 'happy'
+  | 'sad'
+  | 'stressed'
+  | 'lonely'
+  | 'confused'
+  | 'angry'
+  | 'excited';
+
+export type AppTheme = 'dark' | 'light';
+
+export type AppLanguage = 'en-US' | 'hi-IN' | 'kn-IN';
+
+export interface GeneratedImageItem {
+  id: string;
+  prompt: string;
+  aspectRatio: string;
+  dataUrl: string;
+  createdAt: number;
+}
+
+export interface GeneratedAudioItem {
+  id: string;
+  title: string;
+  prompt: string;
+  category: 'focus' | 'relaxation' | 'sleep' | 'binaural';
+  audioUrl: string;
+  duration?: number;
+  createdAt: number;
+}
+
+export interface GeneratedVideoItem {
+  id: string;
+  prompt: string;
+  videoUrl: string;
+  aspectRatio: string;
+  createdAt: number;
+}
+
 export interface UserSettings {
   id?: number;
   userName: string;
-  language: string; // 'en-US', 'es-ES', 'fr-FR', 'de-DE', 'hi-IN', 'ja-JP'
+  language: AppLanguage; // 'en-US', 'hi-IN', 'kn-IN'
+  theme: AppTheme; // 'dark' | 'light'
   geminiApiKey: string;
   ttsVoice: string;
   ttsSpeed: number; // 0.8 - 1.2
-  avatarModel: 'stylized_human' | 'robot_expressive';
+  avatarModel: 'realistic_pluto' | 'stylized_human';
   soundEnabled: boolean;
   seededDemoData: boolean;
   disclaimerAcknowledged: boolean;
@@ -86,10 +127,10 @@ export interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: number;
-  language?: string;
+  language?: AppLanguage;
   extractedActions?: string[];
   followUpSuggestions?: string[];
-  emotion?: 'calm' | 'empathetic' | 'encouraging' | 'thoughtful' | 'celebratory';
+  emotion?: EmotionType;
 }
 
 export interface CorrelationInsight {

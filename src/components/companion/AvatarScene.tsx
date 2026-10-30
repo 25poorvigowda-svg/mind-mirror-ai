@@ -1,21 +1,22 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, OrbitControls } from '@react-three/drei';
+import { Float, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import type { EmotionType } from '../../types';
 
 interface AvatarSceneProps {
   isSpeaking: boolean;
   isListening: boolean;
-  emotion: 'calm' | 'empathetic' | 'encouraging' | 'thoughtful' | 'celebratory';
+  emotion: EmotionType;
   lipSyncAmplitude: number;
-  modelStyle?: 'stylized_human' | 'robot_expressive';
+  modelStyle?: 'realistic_pluto' | 'stylized_human';
 }
 
 /**
- * Stylized 3D Human Avatar with procedural rigging, head tracking,
- * natural eye blinking, facial expressions, and dynamic lip-sync mouth visemes.
+ * Realistic Female 3D Avatar (Pluto) loaded from /pluto.glb
+ * Uses full facial blendshapes, bone rigging, cursor tracking, and speech lip-sync
  */
-function StylizedHumanAvatar({
+function RealisticPlutoAvatar({
   isSpeaking,
   isListening,
   emotion,
@@ -23,331 +24,211 @@ function StylizedHumanAvatar({
 }: {
   isSpeaking: boolean;
   isListening: boolean;
-  emotion: string;
+  emotion: EmotionType;
   lipSyncAmplitude: number;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const headRef = useRef<THREE.Group>(null);
-  const leftEyeRef = useRef<THREE.Mesh>(null);
-  const rightEyeRef = useRef<THREE.Mesh>(null);
-  const mouthRef = useRef<THREE.Mesh>(null);
-  const leftBrowRef = useRef<THREE.Mesh>(null);
-  const rightBrowRef = useRef<THREE.Mesh>(null);
-  const auraRef = useRef<THREE.Mesh>(null);
+  const { scene } = useGLTF('/pluto.glb');
+  const avatarRef = useRef<THREE.Group>(null);
+  const headBoneRef = useRef<THREE.Bone | null>(null);
+  const neckBoneRef = useRef<THREE.Bone | null>(null);
 
-  // Blinking state
-  const [blinkProgress, setBlinkProgress] = useState(0);
+  // Mesh references for morph targets
+  const morphMeshesRef = useRef<THREE.SkinnedMesh[]>([]);
+
+  // Blinking timer state
   const blinkTimerRef = useRef(0);
+  const [blinkWeight, setBlinkWeight] = useState(0);
 
-  // Color palette for futuristic calm look
-  const colors = useMemo(() => {
-    return {
-      skin: new THREE.Color('#38bdf8'), // subtle glowing teal/cyan skin tone
-      darkSkin: new THREE.Color('#0369a1'),
-      hair: new THREE.Color('#1e1b4b'), // midnight violet
-      suit: new THREE.Color('#0f172a'), // deep navy cyber suit
-      trim: new THREE.Color('#06b6d4'), // bright cyan neon trim
-      accent: new THREE.Color('#8b5cf6'), // violet highlight
-      eyes: new THREE.Color('#38bdf8'), // luminous cyan iris
-      mouth: new THREE.Color('#0284c7'),
-    };
-  }, []);
+  // Cache cloned scene
+  const clonedScene = useMemo(() => {
+    return scene.clone(true);
+  }, [scene]);
+
+  useEffect(() => {
+    const meshes: THREE.SkinnedMesh[] = [];
+    clonedScene.traverse((node) => {
+      if ((node as THREE.Bone).isBone) {
+        if (node.name === 'Head') headBoneRef.current = node as THREE.Bone;
+        if (node.name === 'Neck') neckBoneRef.current = node as THREE.Bone;
+      }
+      if ((node as THREE.SkinnedMesh).isSkinnedMesh) {
+        const mesh = node as THREE.SkinnedMesh;
+        if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+          meshes.push(mesh);
+        }
+      }
+    });
+    morphMeshesRef.current = meshes;
+  }, [clonedScene]);
+
+  // Helper to safely set morph target influence on all face meshes
+  const setMorph = (targetName: string, value: number) => {
+    morphMeshesRef.current.forEach((mesh) => {
+      if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+        const idx = mesh.morphTargetDictionary[targetName];
+        if (idx !== undefined) {
+          mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(
+            mesh.morphTargetInfluences[idx],
+            value,
+            0.2
+          );
+        }
+      }
+    });
+  };
 
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
 
-    // 1. Idle breathing and floating
-    if (groupRef.current) {
-      groupRef.current.position.y = Math.sin(time * 1.5) * 0.05 - 0.2;
+    // 1. Natural Idle Breathing & Micro Sway
+    if (avatarRef.current) {
+      avatarRef.current.position.y = -1.45 + Math.sin(time * 1.6) * 0.015;
     }
 
-    // 2. Head tracking mouse cursor
-    if (headRef.current) {
-      const targetRotationY = state.pointer.x * 0.45;
-      const targetRotationX = -state.pointer.y * 0.35;
-      headRef.current.rotation.y = THREE.MathUtils.lerp(headRef.current.rotation.y, targetRotationY, 0.08);
-      headRef.current.rotation.x = THREE.MathUtils.lerp(headRef.current.rotation.x, targetRotationX, 0.08);
+    // 2. Cursor tracking with Head and Neck bones
+    if (headBoneRef.current) {
+      const targetRotY = state.pointer.x * 0.35;
+      const targetRotX = -state.pointer.y * 0.25;
+      headBoneRef.current.rotation.y = THREE.MathUtils.lerp(headBoneRef.current.rotation.y, targetRotY, 0.08);
+      headBoneRef.current.rotation.x = THREE.MathUtils.lerp(headBoneRef.current.rotation.x, targetRotX, 0.08);
 
-      // Subtle head tilt when listening or empathetic
-      if (isListening || emotion === 'empathetic') {
-        headRef.current.rotation.z = THREE.MathUtils.lerp(headRef.current.rotation.z, 0.08, 0.05);
-      } else {
-        headRef.current.rotation.z = THREE.MathUtils.lerp(headRef.current.rotation.z, 0, 0.05);
-      }
+      // Listening alert tilt
+      const targetTilt = isListening ? 0.09 : emotion === 'confused' ? -0.12 : 0;
+      headBoneRef.current.rotation.z = THREE.MathUtils.lerp(headBoneRef.current.rotation.z, targetTilt, 0.06);
     }
 
-    // 3. Eye Blinking timer
+    if (neckBoneRef.current) {
+      neckBoneRef.current.rotation.y = THREE.MathUtils.lerp(neckBoneRef.current.rotation.y, state.pointer.x * 0.15, 0.05);
+    }
+
+    // 3. Natural Eye Blinking cycle
     blinkTimerRef.current += delta;
-    if (blinkTimerRef.current > 3.5 + Math.sin(time) * 1.5) {
+    if (blinkTimerRef.current > 3.8 + Math.sin(time * 0.7) * 1.5) {
       blinkTimerRef.current = 0;
-      setBlinkProgress(1);
+      setBlinkWeight(1);
     }
-    if (blinkProgress > 0) {
-      setBlinkProgress((prev) => Math.max(0, prev - delta * 6));
+    if (blinkWeight > 0) {
+      setBlinkWeight((prev) => Math.max(0, prev - delta * 7));
     }
+    setMorph('eyeBlinkLeft', blinkWeight);
+    setMorph('eyeBlinkRight', blinkWeight);
 
-    // Apply blink scaling to eyes
-    if (leftEyeRef.current && rightEyeRef.current) {
-      const eyeScaleY = 1 - blinkProgress * 0.9;
-      leftEyeRef.current.scale.y = eyeScaleY;
-      rightEyeRef.current.scale.y = eyeScaleY;
-    }
+    // 4. Emotion-based Facial Expressions
+    const isHappy = emotion === 'happy' || emotion === 'excited';
+    const isSad = emotion === 'sad' || emotion === 'lonely';
+    const isStressed = emotion === 'stressed';
+    const isConfused = emotion === 'confused';
+    const isAngry = emotion === 'angry';
 
-    // 4. Dynamic Lip-Sync Viseme
-    if (mouthRef.current) {
-      let targetMouthY = 0.2;
-      let targetMouthX = 1.0;
+    setMorph('mouthSmile', isHappy ? 0.8 : emotion === 'calm' ? 0.15 : 0);
+    setMorph('mouthSmileLeft', isHappy ? 0.4 : 0);
+    setMorph('mouthSmileRight', isHappy ? 0.4 : 0);
+    setMorph('mouthFrownLeft', isSad || isAngry ? 0.6 : 0);
+    setMorph('mouthFrownRight', isSad || isAngry ? 0.6 : 0);
 
-      if (isSpeaking) {
-        // Modulate with lip sync amplitude + fallback sine wave
-        const amp = lipSyncAmplitude > 0 ? lipSyncAmplitude : (Math.sin(time * 12) * 0.5 + 0.5) * 0.8;
-        targetMouthY = 0.2 + amp * 1.8;
-        targetMouthX = 1.0 + amp * 0.4;
-      } else {
-        // Emotion-based static mouth curve
-        if (emotion === 'celebratory' || emotion === 'encouraging') {
-          targetMouthX = 1.3;
-          targetMouthY = 0.35;
-        } else if (emotion === 'empathetic') {
-          targetMouthX = 1.1;
-          targetMouthY = 0.25;
-        } else {
-          targetMouthX = 1.0;
-          targetMouthY = 0.2;
-        }
-      }
+    setMorph('browInnerUp', isSad || isConfused ? 0.6 : 0);
+    setMorph('browOuterUpLeft', isHappy ? 0.45 : 0);
+    setMorph('browOuterUpRight', isHappy ? 0.45 : 0);
+    setMorph('browDownLeft', isStressed || isAngry ? 0.65 : 0);
+    setMorph('browDownRight', isStressed || isAngry ? 0.65 : isConfused ? 0.35 : 0);
 
-      mouthRef.current.scale.y = THREE.MathUtils.lerp(mouthRef.current.scale.y, targetMouthY, 0.25);
-      mouthRef.current.scale.x = THREE.MathUtils.lerp(mouthRef.current.scale.x, targetMouthX, 0.25);
-    }
+    setMorph('eyeSquintLeft', isStressed ? 0.4 : isHappy ? 0.2 : 0);
+    setMorph('eyeSquintRight', isStressed ? 0.4 : isHappy ? 0.2 : 0);
+    setMorph('eyeWideLeft', emotion === 'excited' ? 0.35 : 0);
+    setMorph('eyeWideRight', emotion === 'excited' ? 0.35 : 0);
+    setMorph('noseSneerLeft', isAngry ? 0.5 : 0);
+    setMorph('noseSneerRight', isAngry ? 0.5 : 0);
 
-    // 5. Eyebrow expressions
-    if (leftBrowRef.current && rightBrowRef.current) {
-      let browY = 0.38;
-      let browRot = 0;
+    // 5. Speech-Synchronized Lip Movement (Visemes & Jaw Open)
+    if (isSpeaking) {
+      const baseAmp = lipSyncAmplitude > 0 ? lipSyncAmplitude : (Math.sin(time * 14) * 0.5 + 0.5) * 0.75;
+      const openAmount = Math.min(1.0, baseAmp * 1.25);
+      const visemeA = Math.sin(time * 11) > 0 ? openAmount * 0.9 : 0.1;
+      const visemeO = Math.cos(time * 9) > 0.2 ? openAmount * 0.7 : 0;
+      const visemeE = Math.sin(time * 16) > 0 ? openAmount * 0.6 : 0;
 
-      if (emotion === 'thoughtful') {
-        browY = 0.35;
-        browRot = 0.15;
-      } else if (emotion === 'empathetic') {
-        browY = 0.42;
-        browRot = -0.12;
-      } else if (emotion === 'celebratory') {
-        browY = 0.44;
-        browRot = 0.05;
-      }
-
-      leftBrowRef.current.position.y = THREE.MathUtils.lerp(leftBrowRef.current.position.y, browY, 0.1);
-      rightBrowRef.current.position.y = THREE.MathUtils.lerp(rightBrowRef.current.position.y, browY, 0.1);
-      leftBrowRef.current.rotation.z = THREE.MathUtils.lerp(leftBrowRef.current.rotation.z, browRot, 0.1);
-      rightBrowRef.current.rotation.z = THREE.MathUtils.lerp(rightBrowRef.current.rotation.z, -browRot, 0.1);
-    }
-
-    // 6. Rotating holographic aura ring
-    if (auraRef.current) {
-      auraRef.current.rotation.z += delta * (isSpeaking ? 0.9 : 0.3);
-      auraRef.current.rotation.x = Math.sin(time * 0.5) * 0.2 + 0.2;
+      setMorph('mouthOpen', openAmount * 0.8);
+      setMorph('jawOpen', openAmount * 0.9);
+      setMorph('viseme_aa', visemeA);
+      setMorph('viseme_O', visemeO);
+      setMorph('viseme_E', visemeE);
+    } else {
+      setMorph('mouthOpen', 0);
+      setMorph('jawOpen', 0);
+      setMorph('viseme_aa', 0);
+      setMorph('viseme_O', 0);
+      setMorph('viseme_E', 0);
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, -0.2, 0]}>
-      {/* Holographic Glowing Aura Ring behind head */}
-      <mesh ref={auraRef} position={[0, 0.7, -0.6]}>
-        <torusGeometry args={[0.9, 0.015, 16, 64]} />
-        <meshStandardMaterial
-          color={isSpeaking ? colors.trim : isListening ? colors.accent : colors.trim}
-          emissive={isSpeaking ? colors.trim : isListening ? colors.accent : colors.trim}
-          emissiveIntensity={isSpeaking ? 1.8 : 0.8}
-          transparent
-          opacity={0.7}
-        />
-      </mesh>
-
-      {/* Chest & Cyber Shoulders */}
-      <group position={[0, 0, 0]}>
-        <mesh position={[0, 0, 0]}>
-          <cylinderGeometry args={[0.42, 0.35, 0.7, 32]} />
-          <meshStandardMaterial color={colors.suit} roughness={0.3} metalness={0.7} />
-        </mesh>
-
-        {/* Cyber Neon Chest Core (pulses when thinking or speaking) */}
-        <mesh position={[0, 0.08, 0.24]}>
-          <circleGeometry args={[0.1, 32]} />
-          <meshStandardMaterial
-            color={isSpeaking ? colors.trim : isListening ? colors.accent : colors.trim}
-            emissive={isSpeaking ? colors.trim : isListening ? colors.accent : colors.trim}
-            emissiveIntensity={isSpeaking ? 2.5 : isListening ? 2.0 : 0.9}
-          />
-        </mesh>
-
-        {/* Shoulders */}
-        <mesh position={[-0.55, 0.22, 0]}>
-          <sphereGeometry args={[0.2, 24, 24]} />
-          <meshStandardMaterial color={colors.suit} roughness={0.4} metalness={0.6} />
-        </mesh>
-        <mesh position={[0.55, 0.22, 0]}>
-          <sphereGeometry args={[0.2, 24, 24]} />
-          <meshStandardMaterial color={colors.suit} roughness={0.4} metalness={0.6} />
-        </mesh>
-      </group>
-
-      {/* Head and Face Group */}
-      <group ref={headRef} position={[0, 0.72, 0]}>
-        {/* Neck */}
-        <mesh position={[0, -0.32, 0]}>
-          <cylinderGeometry args={[0.16, 0.18, 0.3, 24]} />
-          <meshStandardMaterial color={colors.suit} roughness={0.4} metalness={0.5} />
-        </mesh>
-
-        {/* Head Mesh */}
-        <mesh position={[0, 0.1, 0]}>
-          <sphereGeometry args={[0.46, 32, 32]} />
-          <meshStandardMaterial
-            color="#0ea5e9"
-            roughness={0.25}
-            metalness={0.4}
-            emissive="#0369a1"
-            emissiveIntensity={0.2}
-          />
-        </mesh>
-
-        {/* Stylized Hair Crest */}
-        <mesh position={[0, 0.44, -0.06]} rotation={[-0.2, 0, 0]}>
-          <boxGeometry args={[0.4, 0.22, 0.55]} />
-          <meshStandardMaterial color={colors.hair} roughness={0.5} />
-        </mesh>
-
-        {/* Eyebrows */}
-        <mesh ref={leftBrowRef} position={[-0.17, 0.38, 0.42]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[0.14, 0.024, 0.02]} />
-          <meshStandardMaterial color="#38bdf8" emissive="#38bdf8" emissiveIntensity={0.5} />
-        </mesh>
-        <mesh ref={rightBrowRef} position={[0.17, 0.38, 0.42]} rotation={[0, 0, 0]}>
-          <boxGeometry args={[0.14, 0.024, 0.02]} />
-          <meshStandardMaterial color="#38bdf8" emissive="#38bdf8" emissiveIntensity={0.5} />
-        </mesh>
-
-        {/* Eyes (Left & Right) */}
-        <group position={[-0.17, 0.24, 0.4]}>
-          <mesh ref={leftEyeRef}>
-            <sphereGeometry args={[0.07, 24, 24]} />
-            <meshStandardMaterial
-              color="#e0f2fe"
-              emissive={isListening ? colors.accent : colors.trim}
-              emissiveIntensity={1.2}
-            />
-          </mesh>
-          {/* Pupil */}
-          <mesh position={[0, 0, 0.055]}>
-            <circleGeometry args={[0.035, 16]} />
-            <meshBasicMaterial color="#0c4a6e" />
-          </mesh>
-        </group>
-
-        <group position={[0.17, 0.24, 0.4]}>
-          <mesh ref={rightEyeRef}>
-            <sphereGeometry args={[0.07, 24, 24]} />
-            <meshStandardMaterial
-              color="#e0f2fe"
-              emissive={isListening ? colors.accent : colors.trim}
-              emissiveIntensity={1.2}
-            />
-          </mesh>
-          {/* Pupil */}
-          <mesh position={[0, 0, 0.055]}>
-            <circleGeometry args={[0.035, 16]} />
-            <meshBasicMaterial color="#0c4a6e" />
-          </mesh>
-        </group>
-
-        {/* Nose Bridge */}
-        <mesh position={[0, 0.14, 0.44]}>
-          <coneGeometry args={[0.04, 0.12, 16]} />
-          <meshStandardMaterial color="#0284c7" roughness={0.3} />
-        </mesh>
-
-        {/* Dynamic Mouth (Viseme Scale Target) */}
-        <mesh ref={mouthRef} position={[0, -0.04, 0.42]}>
-          <capsuleGeometry args={[0.035, 0.12, 12, 16]} />
-          <meshStandardMaterial
-            color="#0369a1"
-            emissive={isSpeaking ? colors.trim : '#0284c7'}
-            emissiveIntensity={isSpeaking ? 1.0 : 0.3}
-          />
-        </mesh>
-
-        {/* Cyber Temple Interface Headset */}
-        <mesh position={[-0.47, 0.12, 0]} rotation={[0, 0, 1.57]}>
-          <cylinderGeometry args={[0.09, 0.09, 0.08, 16]} />
-          <meshStandardMaterial color={colors.suit} metalness={0.9} roughness={0.2} />
-        </mesh>
-        <mesh position={[-0.48, 0.12, 0]}>
-          <circleGeometry args={[0.06, 16]} />
-          <meshStandardMaterial
-            color={colors.trim}
-            emissive={colors.trim}
-            emissiveIntensity={isSpeaking ? 2.0 : 0.8}
-          />
-        </mesh>
-
-        <mesh position={[0.47, 0.12, 0]} rotation={[0, 0, 1.57]}>
-          <cylinderGeometry args={[0.09, 0.09, 0.08, 16]} />
-          <meshStandardMaterial color={colors.suit} metalness={0.9} roughness={0.2} />
-        </mesh>
-        <mesh position={[0.48, 0.12, 0]}>
-          <circleGeometry args={[0.06, 16]} />
-          <meshStandardMaterial
-            color={colors.trim}
-            emissive={colors.trim}
-            emissiveIntensity={isSpeaking ? 2.0 : 0.8}
-          />
-        </mesh>
-      </group>
+    <group ref={avatarRef} position={[0, -1.45, 0]} scale={[1.4, 1.4, 1.4]}>
+      <primitive object={clonedScene} />
     </group>
   );
 }
 
 /**
- * Expressive 3D Floating Particle Field
+ * Holographic Floating Energy Particles
  */
 function HolographicParticleField({ isSpeaking }: { isSpeaking: boolean }) {
   const pointsRef = useRef<THREE.Points>(null);
-  const count = 75;
+  const count = 90;
 
-  const [positions] = useState(() => {
+  const positions = useMemo(() => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 4;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 3;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 3 - 0.5;
+      const rx = (Math.sin(i * 14.23 + 1.2) * 43758.54) % 1;
+      const ry = (Math.sin(i * 26.54 + 2.7) * 43758.54) % 1;
+      const rz = (Math.sin(i * 39.81 + 4.1) * 43758.54) % 1;
+      pos[i * 3] = rx * 5;
+      pos[i * 3 + 1] = ry * 4;
+      pos[i * 3 + 2] = rz * 3 - 0.5;
     }
     return pos;
-  });
+  }, [count]);
 
   useFrame((_, delta) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y += delta * (isSpeaking ? 0.25 : 0.08);
-      pointsRef.current.rotation.x += delta * 0.04;
+      pointsRef.current.rotation.y += delta * (isSpeaking ? 0.35 : 0.1);
+      pointsRef.current.rotation.x += delta * 0.05;
     }
   });
 
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
         size={0.035}
         color="#38bdf8"
         transparent
-        opacity={isSpeaking ? 0.75 : 0.4}
+        opacity={isSpeaking ? 0.8 : 0.45}
         blending={THREE.AdditiveBlending}
       />
     </points>
+  );
+}
+
+/**
+ * Fallback glowing loading placeholder while 3D mesh loads
+ */
+function AvatarLoadingPlaceholder() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += delta * 1.5;
+    }
+  });
+
+  return (
+    <group position={[0, 0, 0]}>
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[0.35, 24, 24]} />
+        <meshStandardMaterial color="#06b6d4" wireframe transparent opacity={0.6} />
+      </mesh>
+    </group>
   );
 }
 
@@ -357,50 +238,73 @@ export const AvatarScene: React.FC<AvatarSceneProps> = ({
   emotion,
   lipSyncAmplitude,
 }) => {
+  // Lighting highlights that react to emotional presence
+  const rimColor = useMemo(() => {
+    switch (emotion) {
+      case 'happy':
+      case 'excited':
+        return '#38bdf8'; // vivid cyan
+      case 'stressed':
+        return '#f59e0b'; // amber warning
+      case 'sad':
+      case 'lonely':
+        return '#818cf8'; // gentle soft indigo
+      case 'angry':
+        return '#f43f5e'; // rose
+      case 'confused':
+        return '#c084fc'; // violet
+      case 'calm':
+      default:
+        return '#2dd4bf'; // teal
+    }
+  }, [emotion]);
+
   return (
-    <div className="relative w-full h-full min-h-[340px] flex items-center justify-center">
+    <div className="relative w-full h-full min-h-[380px] md:min-h-[460px] flex items-center justify-center select-none">
       <Canvas
-        camera={{ position: [0, 0.5, 2.6], fov: 42 }}
+        camera={{ position: [0, 0.25, 1.45], fov: 38 }}
         className="w-full h-full cursor-grab active:cursor-grabbing"
       >
-        {/* Ambient lighting */}
-        <ambientLight intensity={0.5} />
+        {/* Soft Ambient Environment */}
+        <ambientLight intensity={0.8} />
 
-        {/* Directional Key Light (Cyan) */}
-        <directionalLight position={[2, 3, 3]} intensity={1.2} color="#bae6fd" />
+        {/* Key Light (Soft Warm Studio) */}
+        <directionalLight position={[1.5, 2.5, 2.0]} intensity={1.4} color="#f0f9ff" />
 
-        {/* Fill Light (Soft Teal) */}
-        <directionalLight position={[-3, 1, 2]} intensity={0.7} color="#2dd4bf" />
+        {/* Soft Fill Light */}
+        <directionalLight position={[-2, 1, 1.5]} intensity={0.9} color="#bae6fd" />
 
-        {/* Rim / Back Light (Futuristic Violet) */}
-        <pointLight position={[0, 2, -2]} intensity={2.0} color="#c084fc" />
+        {/* Reactive Emotional Rim Light */}
+        <pointLight position={[0, 1.5, -1.5]} intensity={2.2} color={rimColor} />
 
-        {/* Underlight (Subtle Cyber glow) */}
-        <pointLight position={[0, -2, 1]} intensity={0.8} color="#0284c7" />
+        {/* Subtle Underlight */}
+        <pointLight position={[0, -1.2, 0.8]} intensity={0.7} color="#0284c7" />
 
-        <Float speed={1.8} rotationIntensity={0.2} floatIntensity={0.3}>
-          <StylizedHumanAvatar
-            isSpeaking={isSpeaking}
-            isListening={isListening}
-            emotion={emotion}
-            lipSyncAmplitude={lipSyncAmplitude}
-          />
-        </Float>
+        <Suspense fallback={<AvatarLoadingPlaceholder />}>
+          <Float speed={1.5} rotationIntensity={0.12} floatIntensity={0.25}>
+            <RealisticPlutoAvatar
+              isSpeaking={isSpeaking}
+              isListening={isListening}
+              emotion={emotion}
+              lipSyncAmplitude={lipSyncAmplitude}
+            />
+          </Float>
+        </Suspense>
 
         <HolographicParticleField isSpeaking={isSpeaking} />
 
         <OrbitControls
           enableZoom={false}
           enablePan={false}
-          maxPolarAngle={Math.PI / 2 + 0.1}
+          maxPolarAngle={Math.PI / 2 + 0.05}
           minPolarAngle={Math.PI / 3}
-          maxAzimuthAngle={Math.PI / 4}
-          minAzimuthAngle={-Math.PI / 4}
+          maxAzimuthAngle={Math.PI / 5}
+          minAzimuthAngle={-Math.PI / 5}
         />
       </Canvas>
 
-      {/* Floating Status Pill over Canvas */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/85 border border-cyan-500/30 backdrop-blur-md text-xs font-semibold text-cyan-300 shadow-lg">
+      {/* Floating Interactive Status Pill */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/85 dark:bg-slate-900/85 light:bg-white/90 border border-cyan-500/30 backdrop-blur-md text-xs font-semibold text-cyan-300 dark:text-cyan-300 light:text-cyan-700 shadow-lg">
         <span
           className={`w-2.5 h-2.5 rounded-full ${
             isSpeaking
@@ -415,8 +319,13 @@ export const AvatarScene: React.FC<AvatarSceneProps> = ({
             ? 'Pluto: Speaking & Reflecting...'
             : isListening
             ? 'Pluto: Listening to you...'
-            : `Pluto 3D • ${emotion.charAt(0).toUpperCase() + emotion.slice(1)}`}
+            : `Pluto 3D • ${emotion.toUpperCase()}`}
         </span>
+      </div>
+
+      {/* Orbit Hint */}
+      <div className="absolute bottom-3 right-4 z-10 text-[10px] text-slate-400/80 pointer-events-none">
+        Drag to inspect 3D view
       </div>
     </div>
   );

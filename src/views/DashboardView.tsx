@@ -254,15 +254,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <button
               onClick={() => onNavigate('companion')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 font-bold text-sm hover:brightness-110 shadow-lg shadow-cyan-500/20 transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 font-bold text-sm hover:brightness-110 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
             >
               <Bot className="w-4 h-4" />
-              <span>Open Pluto 3D Companion</span>
+              <span>Talk with Pluto 3D</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
+            <button
+              onClick={() => onNavigate('studio')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Mind Studio (Art, Audio, Video)</span>
+            </button>
+
             <span className="text-xs text-slate-400">
-              Supports English, Spanish, French, German, Hindi, and Japanese
+              Languages: English • हिन्दी (Hindi) • ಕನ್ನಡ (Kannada)
             </span>
           </div>
         </div>

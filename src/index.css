@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
 @layer base {
-  :root {
+  :root, html.dark {
     --bg-deep: #070b14;
     --bg-surface: #0d1527;
     --bg-card: rgba(16, 26, 48, 0.75);
+    --bg-card-solid: #0d1527;
     --border-subtle: rgba(56, 189, 248, 0.12);
     --border-highlight: rgba(56, 189, 248, 0.35);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
     --cyan-glow: #06b6d4;
     --teal-glow: #14b8a6;
     --violet-glow: #8b5cf6;
     color-scheme: dark;
   }
 
+  html.light {
+    --bg-deep: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-card: rgba(255, 255, 255, 0.88);
+    --bg-card-solid: #ffffff;
+    --border-subtle: rgba(14, 165, 233, 0.18);
+    --border-highlight: rgba(14, 165, 233, 0.45);
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --cyan-glow: #0284c7;
+    --teal-glow: #0d9488;
+    --violet-glow: #7c3aed;
+    color-scheme: light;
+  }
+
   body {
     margin: 0;
     padding: 0;
     background-color: var(--bg-deep);
-    color: #e2e8f0;
+    color: var(--text-primary);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   #root {
@@ -39,23 +60,24 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #090e1a;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1e293b;
+    background: #334155;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: #475569;
   }
 }
 
 /* Glassmorphism helpers */
 .glass-panel {
-  background: rgba(13, 21, 39, 0.7);
+  background: var(--bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(56, 189, 248, 0.12);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-panel-hover {
@@ -63,9 +85,8 @@
 }
 
 .glass-panel-hover:hover {
-  background: rgba(19, 31, 56, 0.85);
-  border-color: rgba(56, 189, 248, 0.28);
-  box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.15);
+  border-color: var(--border-highlight);
+  box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.18);
 }
 
 .glow-cyan {
