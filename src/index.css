@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-deep: #070b14;
+    --bg-surface: #0d1527;
+    --bg-card: rgba(16, 26, 48, 0.75);
+    --border-subtle: rgba(56, 189, 248, 0.12);
+    --border-highlight: rgba(56, 189, 248, 0.35);
+    --cyan-glow: #06b6d4;
+    --teal-glow: #14b8a6;
+    --violet-glow: #8b5cf6;
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-deep);
+    color: #e2e8f0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    margin: 0;
+    border: none;
+    text-align: left;
+  }
+
+  /* Custom smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090e1a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(13, 21, 39, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(19, 31, 56, 0.85);
+  border-color: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 10px 30px -10px rgba(6, 182, 212, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+}
+
+.glow-violet {
+  box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25);
+}
+
+/* Wave audio visualizer bars animation */
+@keyframes pulseBar {
+  0%, 100% { height: 6px; }
+  50% { height: 28px; }
+}
+
+.animate-pulse-bar-1 { animation: pulseBar 0.9s ease-in-out infinite 0.1s; }
+.animate-pulse-bar-2 { animation: pulseBar 0.7s ease-in-out infinite 0.25s; }
+.animate-pulse-bar-3 { animation: pulseBar 1.1s ease-in-out infinite 0.15s; }
+.animate-pulse-bar-4 { animation: pulseBar 0.8s ease-in-out infinite 0.35s; }
+.animate-pulse-bar-5 { animation: pulseBar 1.0s ease-in-out infinite 0.05s; }
