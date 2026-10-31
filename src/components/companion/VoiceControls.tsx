@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Globe, Square, Volume1 } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, Globe, Square, Volume1, AlertCircle, Loader2 } from 'lucide-react';
 import { LANGUAGE_OPTIONS, type SupportedLanguage } from '../../services/speech';
 
 interface VoiceControlsProps {
@@ -8,10 +8,15 @@ interface VoiceControlsProps {
   isMuted: boolean;
   language: SupportedLanguage;
   interimTranscript: string;
+  voiceError?: string | null;
+  voiceStatus?: string | null;
+  isTranscribing?: boolean;
+  userMicLevel?: number;
   onToggleListen: () => void;
   onToggleMute: () => void;
   onStopSpeaking?: () => void;
   onSelectLanguage: (lang: SupportedLanguage) => void;
+  onDismissError?: () => void;
 }
 
 export const VoiceControls: React.FC<VoiceControlsProps> = ({
@@ -20,10 +25,15 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
   isMuted,
   language,
   interimTranscript,
+  voiceError,
+  voiceStatus,
+  isTranscribing,
+  userMicLevel = 0,
   onToggleListen,
   onToggleMute,
   onStopSpeaking,
   onSelectLanguage,
+  onDismissError,
 }) => {
   const getListeningPlaceholder = (lang: SupportedLanguage) => {
     switch (lang) {
@@ -38,13 +48,67 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      {/* Live Speech Recognition Bubble */}
-      {isListening && (
-        <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-violet-950/50 border border-violet-500/40 text-violet-200 text-xs shadow-lg animate-pulse">
-          <Mic className="w-4 h-4 text-violet-400 shrink-0 animate-bounce" />
-          <span className="font-medium italic">
-            {interimTranscript || getListeningPlaceholder(language)}
+      {/* Actionable Error Banner if Mic is Blocked or Error occurs */}
+      {voiceError && (
+        <div className="flex items-start justify-between gap-3 p-3.5 rounded-2xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs shadow-xl animate-fadeIn backdrop-blur-md">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-semibold block text-rose-100">Microphone Notice</span>
+              <p className="text-[11px] leading-relaxed text-rose-200/90">{voiceError}</p>
+            </div>
+          </div>
+          {onDismissError && (
+            <button
+              onClick={onDismissError}
+              className="text-rose-400 hover:text-white text-xs px-2 py-0.5 rounded-lg bg-rose-900/60 font-semibold shrink-0 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Live Transcribing State Indicator */}
+      {isTranscribing && (
+        <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-teal-950/70 border border-teal-500/40 text-teal-200 text-xs shadow-lg animate-pulse">
+          <Loader2 className="w-4 h-4 text-teal-400 shrink-0 animate-spin" />
+          <span className="font-medium">
+            {voiceStatus || 'Transcribing your voice input with Pluto...'}
           </span>
+        </div>
+      )}
+
+      {/* Live Speech Recognition Bubble & Voice Meter */}
+      {isListening && (
+        <div className="flex flex-col gap-2 p-3.5 rounded-2xl bg-violet-950/60 border border-violet-500/40 text-violet-200 text-xs shadow-lg">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <Mic className="w-4 h-4 text-violet-400 shrink-0 animate-bounce" />
+              <span className="font-semibold text-violet-300">
+                {voiceStatus || 'Microphone Active'}
+              </span>
+            </div>
+
+            {/* Live Audio Level Meter */}
+            <div className="flex items-center gap-1">
+              {[0.15, 0.35, 0.55, 0.75, 0.95].map((thresh, idx) => {
+                const isActive = (userMicLevel || 0) >= thresh;
+                return (
+                  <span
+                    key={idx}
+                    className={`w-1 rounded-full transition-all duration-75 ${
+                      isActive ? 'bg-cyan-400 h-4' : 'bg-violet-900/60 h-1.5'
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="font-medium italic text-slate-200 bg-slate-950/50 p-2.5 rounded-xl border border-violet-500/20">
+            {interimTranscript || getListeningPlaceholder(language)}
+          </div>
         </div>
       )}
 
@@ -68,7 +132,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
         </div>
       )}
 
-      {/* Controls toolbar */}
+      {/* Controls Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-slate-900/80 dark:bg-slate-900/80 light:bg-white/90 border border-slate-800 dark:border-slate-800 light:border-slate-200 backdrop-blur-md shadow-md">
         {/* Language selector */}
         <div className="flex items-center gap-2">
@@ -90,13 +154,21 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleListen}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-lg cursor-pointer ${
+            disabled={isTranscribing}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-lg cursor-pointer disabled:opacity-50 ${
               isListening
                 ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 animate-pulse'
+                : isTranscribing
+                ? 'bg-teal-700 text-white'
                 : 'bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 shadow-cyan-500/25'
             }`}
           >
-            {isListening ? (
+            {isTranscribing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Transcribing...</span>
+              </>
+            ) : isListening ? (
               <>
                 <MicOff className="w-4 h-4" />
                 <span>Done Speaking</span>

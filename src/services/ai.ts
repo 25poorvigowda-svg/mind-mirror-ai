@@ -113,12 +113,19 @@ export async function generateCheckInReflection(
 }
 
 /**
- * Generate image visualization via server-side Gemini 3.1 Flash Lite Image
+ * Generate image visualization via server-side Gemini 3.1 Flash Lite Image or Mind Canvas
  */
 export async function generateMindImage(
   prompt: string,
   aspectRatio: string = '1:1'
-): Promise<{ success: boolean; imageUrl?: string; error?: string }> {
+): Promise<{
+  success: boolean;
+  imageUrl?: string;
+  aspectRatio?: string;
+  isGenerativeFallback?: boolean;
+  notice?: string;
+  error?: string;
+}> {
   try {
     const res = await fetch('/api/gemini/image', {
       method: 'POST',
@@ -130,7 +137,13 @@ export async function generateMindImage(
     if (!res.ok || !data.success) {
       return { success: false, error: data.error || 'Failed to generate image' };
     }
-    return { success: true, imageUrl: data.imageUrl };
+    return {
+      success: true,
+      imageUrl: data.imageUrl,
+      aspectRatio: data.aspectRatio || aspectRatio,
+      isGenerativeFallback: data.isGenerativeFallback,
+      notice: data.notice,
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Image generation network error' };
   }

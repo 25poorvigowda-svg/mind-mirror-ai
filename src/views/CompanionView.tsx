@@ -42,6 +42,10 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
   const [language, setLanguage] = useState<SupportedLanguage>((settings?.language as SupportedLanguage) || 'en-US');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [userMicLevel, setUserMicLevel] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userName = userProfile?.fullName ? userProfile.fullName.split(' ')[0] : 'there';
@@ -176,40 +180,75 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
     }
   };
 
-  const handleToggleListen = () => {
+  const handleToggleListen = async () => {
+    setVoiceError(null);
+
     if (isListening) {
-      speechService.stopListening();
       setIsListening(false);
-      if (interimTranscript.trim()) {
-        handleSendMessage(interimTranscript);
+      setIsTranscribing(true);
+      setVoiceStatus('Processing voice input...');
+
+      try {
+        const finalTranscript = await speechService.stopListening();
+        const textToSubmit = (finalTranscript || interimTranscript).trim();
+        if (textToSubmit.length > 1) {
+          handleSendMessage(textToSubmit);
+        } else {
+          setVoiceError('No speech detected. Please speak clearly into your microphone.');
+        }
+      } catch (err: any) {
+        console.warn('Stop listening error:', err);
+      } finally {
+        setIsTranscribing(false);
+        setVoiceStatus(null);
+        setInterimTranscript('');
+        setUserMicLevel(0);
       }
     } else {
       speechService.stopSpeaking();
       setIsSpeaking(false);
+      setInterimTranscript('');
+      setVoiceStatus('Requesting microphone...');
 
-      const started = speechService.startListening(language, {
+      const started = await speechService.startListening(language, {
         onStart: () => {
           setIsListening(true);
           setEmotion('calm');
+          setVoiceStatus(null);
+          setVoiceError(null);
         },
         onResult: (transcript, isFinal) => {
           setInterimTranscript(transcript);
           if (isFinal && transcript.trim().length > 1) {
             setIsListening(false);
-            handleSendMessage(transcript);
+            setUserMicLevel(0);
+            speechService.stopListening();
+            handleSendMessage(transcript.trim());
           }
+        },
+        onAudioLevel: (level) => {
+          setUserMicLevel(level);
+        },
+        onStatus: (status) => {
+          setVoiceStatus(status);
         },
         onError: (err) => {
           console.warn('Voice recognition error:', err);
           setIsListening(false);
+          setIsTranscribing(false);
+          setVoiceStatus(null);
+          setUserMicLevel(0);
+          setVoiceError(err);
         },
         onEnd: () => {
           setIsListening(false);
+          setUserMicLevel(0);
         },
       });
 
       if (!started) {
         setIsListening(false);
+        setVoiceStatus(null);
       }
     }
   };
@@ -252,7 +291,7 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
 
           {/* Quick Context Pill */}
           {latestCheckIn && (
-            <div className="absolute top-4 right-4 z-10 hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/80 text-[11px] text-slate-300 backdrop-blur-md">
+            <div className="absolute top-14 left-4 z-10 hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/80 text-[11px] text-slate-300 backdrop-blur-md pointer-events-none">
               <span>Sleep: {latestCheckIn.sleepHours}h</span>
               <span>•</span>
               <span>Stress: {latestCheckIn.stress}/10</span>
@@ -267,7 +306,12 @@ export const CompanionView: React.FC<CompanionViewProps> = ({
           isMuted={isMuted}
           language={language}
           interimTranscript={interimTranscript}
+          voiceError={voiceError}
+          voiceStatus={voiceStatus}
+          isTranscribing={isTranscribing}
+          userMicLevel={userMicLevel}
           onToggleListen={handleToggleListen}
+          onDismissError={() => setVoiceError(null)}
           onToggleMute={() => {
             if (isSpeaking) speechService.stopSpeaking();
             setIsMuted(!isMuted);

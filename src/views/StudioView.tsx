@@ -78,7 +78,7 @@ export const StudioView: React.FC<StudioViewProps> = ({ onNotify }) => {
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '16:9' | '4:3' | '9:16'>('1:1');
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<
-    { id: string; url: string; prompt: string; ratio: string; createdAt: number }[]
+    { id: string; url: string; prompt: string; ratio: string; createdAt: number; isGenerativeFallback?: boolean; notice?: string }[]
   >([]);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -203,10 +203,12 @@ export const StudioView: React.FC<StudioViewProps> = ({ onNotify }) => {
         prompt: imagePrompt.trim(),
         ratio: aspectRatio,
         createdAt: Date.now(),
+        isGenerativeFallback: res.isGenerativeFallback,
+        notice: res.notice,
       };
       setGeneratedImages((prev) => [newItem, ...prev]);
       confetti({ particleCount: 45, spread: 60 });
-      onNotify?.('Generated wellness image preview ready!');
+      onNotify?.(res.isGenerativeFallback ? 'Mindfulness Canvas art created!' : 'Generated wellness image preview ready!');
     } else {
       setImageError(res.error || 'Image generation failed. Verify API key in Settings.');
     }
@@ -432,12 +434,20 @@ export const StudioView: React.FC<StudioViewProps> = ({ onNotify }) => {
                       />
                     </div>
                     <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300">
+                          {img.isGenerativeFallback ? 'Mind Canvas Art' : 'Gemini 3.1 Flash Lite'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-mono">Ratio {img.ratio}</span>
+                      </div>
                       <p className="text-xs text-slate-300 font-medium line-clamp-2">"{img.prompt}"</p>
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-[11px] text-slate-500">Ratio: {img.ratio}</span>
+                      {img.notice && (
+                        <p className="text-[10px] text-slate-400 mt-1 italic line-clamp-1">{img.notice}</p>
+                      )}
+                      <div className="flex items-center justify-end pt-2">
                         <button
-                          onClick={() => handleDownloadMedia(img.url, `mind-mirror-${img.id}.png`)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-300 text-xs font-semibold hover:bg-cyan-900/50 transition-colors"
+                          onClick={() => handleDownloadMedia(img.url, `mind-mirror-${img.id}.${img.url.startsWith('data:image/svg') ? 'svg' : 'png'}`)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950 border border-cyan-500/30 text-cyan-300 text-xs font-semibold hover:bg-cyan-900/50 transition-colors cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>Download Image</span>

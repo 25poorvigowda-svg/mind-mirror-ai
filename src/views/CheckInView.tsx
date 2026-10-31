@@ -107,16 +107,19 @@ export const CheckInView: React.FC<CheckInViewProps> = ({
     setTasks(tasks.filter((t) => t.id !== taskId));
   };
 
-  const toggleVoiceDictation = () => {
+  const toggleVoiceDictation = async () => {
     if (isDictating) {
-      speechService.stopListening();
       setIsDictating(false);
+      const text = await speechService.stopListening();
+      if (text && text.trim()) {
+        setJournal((prev) => (prev ? `${prev} ${text.trim()}` : text.trim()));
+      }
     } else {
-      const started = speechService.startListening(settings?.language || 'en-US', {
+      const started = await speechService.startListening(settings?.language || 'en-US', {
         onStart: () => setIsDictating(true),
         onResult: (text, isFinal) => {
-          if (isFinal) {
-            setJournal((prev) => (prev ? `${prev} ${text}` : text));
+          if (isFinal && text.trim()) {
+            setJournal((prev) => (prev ? `${prev} ${text.trim()}` : text.trim()));
           }
         },
         onError: () => setIsDictating(false),
